@@ -1,0 +1,7 @@
+experiment_name: stage4_augmentation_basic_color
+metadata:
+  stage: augmentation
+  dimension: augmentation.policy
+  value: basic_color
+augmentation:
+  policy: basic_color

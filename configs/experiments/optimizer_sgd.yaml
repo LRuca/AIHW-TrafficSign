@@ -1,0 +1,8 @@
+experiment_name: stage5_optimizer_sgd
+metadata:
+  stage: optimizer
+  dimension: optimizer.name
+  value: sgd
+optimizer:
+  name: sgd
+  lr: 0.01

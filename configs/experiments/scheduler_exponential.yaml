@@ -1,0 +1,8 @@
+experiment_name: stage6_scheduler_exponential
+metadata:
+  stage: scheduler
+  dimension: scheduler.name
+  value: exponential
+scheduler:
+  name: exponential
+  gamma: 0.97

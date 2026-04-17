@@ -1,0 +1,7 @@
+experiment_name: stage2_finetune_last_stage
+metadata:
+  stage: finetune
+  dimension: finetune.mode
+  value: last_stage
+finetune:
+  mode: last_stage

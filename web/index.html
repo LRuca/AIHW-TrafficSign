@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Traffic Sign Experiments</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #f3f0e8;
+      --panel: #fffdf8;
+      --ink: #1f2430;
+      --muted: #6a6f7d;
+      --line: #d8d0c1;
+      --accent: #0f766e;
+      --accent-2: #b45309;
+      --ok: #166534;
+      --run: #0369a1;
+      --soft: #f7f2e9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", sans-serif;
+      background: linear-gradient(180deg, #f6f2ea 0%, #ebe5d9 100%);
+      color: var(--ink);
+    }
+    .page {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .hero {
+      background: radial-gradient(circle at top left, #fff8ec, #f5ecdc 60%, #eadfcb);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(90, 70, 35, 0.08);
+      margin-bottom: 20px;
+    }
+    .hero h1 { margin: 0 0 8px 0; font-size: 28px; }
+    .hero p { margin: 0; color: var(--muted); }
+    .meta { margin-top: 14px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .chip {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.08);
+      color: var(--accent);
+      border: 1px solid rgba(15, 118, 110, 0.16);
+      font-size: 13px;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.65);
+      border-radius: 999px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .tab-btn.active {
+      background: rgba(3, 105, 161, 0.08);
+      color: var(--run);
+      border-color: rgba(3, 105, 161, 0.2);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 8px 20px rgba(53, 42, 21, 0.05);
+    }
+    .run-list { display: flex; flex-direction: column; gap: 10px; max-height: 72vh; overflow: auto; }
+    .run-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      cursor: pointer;
+      transition: .15s ease;
+      background: #fffdfa;
+    }
+    .run-item.active {
+      border-color: rgba(3, 105, 161, 0.35);
+      background: rgba(3, 105, 161, 0.06);
+    }
+    .run-item:hover { transform: translateY(-1px); }
+    .run-title { font-weight: 700; margin-bottom: 4px; }
+    .run-sub { color: var(--muted); font-size: 13px; }
+    .status {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: white;
+      background: var(--run);
+    }
+    .status.completed { background: var(--ok); }
+    .status.archived { background: #7c3aed; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fffdfa;
+    }
+    .stat .label { color: var(--muted); font-size: 12px; }
+    .stat .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+    .charts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .chart-box, .config-box, .stage-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fffdfa;
+    }
+    .chart-box h3, .config-box h3, .stage-card h3 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+    }
+    canvas {
+      width: 100%;
+      height: 260px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #fff, #faf6ef);
+      border: 1px solid #efe6d6;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #eee5d8;
+      text-align: left;
+    }
+    .img-row, .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    img {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .empty {
+      color: var(--muted);
+      padding: 30px 0;
+      text-align: center;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 8px;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .kv div:nth-child(odd) { color: var(--muted); }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      margin-bottom: 8px;
+    }
+    .action-btn {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .action-btn:hover {
+      border-color: rgba(3, 105, 161, 0.28);
+      color: var(--run);
+    }
+    .compare-layout {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 20px;
+    }
+    .stage-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 74vh;
+      overflow: auto;
+    }
+    .stage-card.active {
+      border-color: rgba(180, 83, 9, 0.32);
+      background: rgba(180, 83, 9, 0.07);
+    }
+    .mini {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .compare-table-wrap {
+      overflow: auto;
+      max-height: 72vh;
+    }
+    @media (max-width: 1200px) {
+      .grid, .compare-layout { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .charts, .img-row, .bottom-grid { grid-template-columns: 1fr; }
+      .kv { grid-template-columns: 120px 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>交通标志实验看板</h1>
+      <p>自动刷新实验进度、训练指标、曲线、配置与横向比较结果。页面每 5 秒同步一次本地运行结果。</p>
+      <div class="meta">
+        <span class="chip">自动刷新：5s</span>
+        <span class="chip" id="run-count-chip">实验数：0</span>
+        <span class="chip" id="stage-count-chip">阶段数：0</span>
+        <span class="chip" id="version-chip">版本：-</span>
+        <span class="chip" id="timestamp-chip">最近更新：-</span>
+      </div>
+    </section>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="detail">单实验详情</button>
+      <button class="tab-btn" data-tab="compare">实验计划与横向比较</button>
+      <button class="tab-btn" data-tab="schedule">实验排程</button>
+    </div>
+
+    <section id="tab-detail" class="tab-panel active">
+      <div class="grid">
+        <div class="panel">
+          <h2>实验列表</h2>
+          <div id="run-list" class="run-list"></div>
+        </div>
+
+        <div class="panel">
+          <div id="detail-empty" class="empty">还没有可展示的实验结果。</div>
+          <div id="detail" style="display:none;">
+            <div class="stats">
+              <div class="stat"><div class="label">实验名</div><div class="value" id="stat-name" style="font-size:16px;"></div></div>
+              <div class="stat"><div class="label">状态</div><div class="value" id="stat-status"></div></div>
+              <div class="stat"><div class="label">当前 Epoch</div><div class="value" id="stat-epoch"></div></div>
+              <div class="stat"><div class="label">最佳 Val Acc</div><div class="value" id="stat-best"></div></div>
+            </div>
+
+            <div class="charts">
+              <div class="chart-box">
+                <h3>Loss / Accuracy 曲线</h3>
+                <canvas id="curve-canvas" width="640" height="260"></canvas>
+              </div>
+              <div class="chart-box">
+                <h3>学习率曲线</h3>
+                <canvas id="lr-canvas" width="640" height="260"></canvas>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Epoch</th>
+                  <th>Train Loss</th>
+                  <th>Val Loss</th>
+                  <th>Train Acc</th>
+                  <th>Val Acc</th>
+                  <th>LR</th>
+                  <th>Epoch Time(s)</th>
+                </tr>
+              </thead>
+              <tbody id="epoch-table"></tbody>
+            </table>
+
+            <div class="actions">
+              <button id="archive-btn" class="action-btn">归档此实验</button>
+              <button id="restore-btn" class="action-btn" style="display:none;">恢复此实验</button>
+            </div>
+
+            <div class="bottom-grid">
+              <div class="config-box">
+                <h3>本次实验配置</h3>
+                <div class="kv" id="config-kv"></div>
+              </div>
+              <div class="config-box">
+                <h3>实验元数据</h3>
+                <div class="kv" id="meta-kv"></div>
+              </div>
+            </div>
+
+            <div class="img-row">
+              <div>
+                <h3>收敛图文件</h3>
+                <img id="curve-image" alt="curves">
+              </div>
+              <div>
+                <h3>混淆矩阵</h3>
+                <img id="cm-image" alt="confusion matrix">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-compare" class="tab-panel">
+      <div class="compare-layout">
+        <div class="panel">
+          <h2>实验安排</h2>
+          <div id="stage-list" class="stage-list"></div>
+        </div>
+        <div class="panel">
+          <div id="compare-empty" class="empty">还没有阶段数据。</div>
+          <div id="compare-detail" style="display:none;">
+            <h2 id="compare-title">-</h2>
+      <div class="mini" id="compare-subtitle"></div>
+            <table>
+              <thead>
+                <tr>
+                  <th>实验名</th>
+                  <th>维度取值</th>
+                  <th>状态</th>
+                  <th>Best Val Acc</th>
+                  <th>Test Acc</th>
+                  <th>Best Macro-F1</th>
+                  <th>Test Macro-F1</th>
+                  <th>Runtime(s)</th>
+                  <th>Trainable Params</th>
+                </tr>
+              </thead>
+            </table>
+            <div class="compare-table-wrap">
+              <table>
+                <tbody id="compare-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-schedule" class="tab-panel">
+      <div class="compare-layout">
+        <div class="panel">
+          <h2>可选实验</h2>
+          <div class="mini">点击卡片加入待运行队列</div>
+          <div id="catalog-list" class="stage-list" style="margin-top:12px;"></div>
+        </div>
+        <div class="panel">
+          <h2>实验队列</h2>
+          <div class="actions">
+            <button id="schedule-start-btn" class="action-btn">启动队列</button>
+            <button id="schedule-stop-btn" class="action-btn">停止当前实验</button>
+            <button id="schedule-clear-btn" class="action-btn">清空队列</button>
+          </div>
+          <div class="mini" id="schedule-status">状态：-</div>
+          <table>
+            <thead>
+              <tr>
+                <th>实验</th>
+                <th>阶段</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="schedule-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const refreshMs = 5000;
+    let state = { runs: [], plan: { stages: [] }, comparisons: [], catalog: [], schedule: { items: [] } };
+    let selectedRunDir = null;
+    let selectedStage = null;
+
+    function fmt(value, digits = 4) {
+      if (value === null || value === undefined || value === "") return "-";
+      const num = Number(value);
+      if (Number.isNaN(num)) return String(value);
+      return num.toFixed(digits);
+    }
+
+    function drawLines(canvasId, rows, series) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#fffdf9";
+      ctx.fillRect(0, 0, w, h);
+
+      const pad = { l: 40, r: 12, t: 16, b: 24 };
+      ctx.strokeStyle = "#d8d0c1";
+      ctx.strokeRect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b);
+      if (!rows.length) return;
+
+      let values = [];
+      series.forEach(s => rows.forEach(r => values.push(Number(r[s.key] || 0))));
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const span = Math.max(max - min, 1e-8);
+
+      series.forEach(s => {
+        ctx.beginPath();
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 2;
+        rows.forEach((row, idx) => {
+          const x = pad.l + idx * ((w - pad.l - pad.r) / Math.max(rows.length - 1, 1));
+          const y = h - pad.b - ((Number(row[s.key] || 0) - min) / span) * (h - pad.t - pad.b);
+          if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      });
+
+      ctx.fillStyle = "#6a6f7d";
+      ctx.font = "12px sans-serif";
+      ctx.fillText(fmt(max), 6, pad.t + 10);
+      ctx.fillText(fmt(min), 6, h - pad.b);
+
+      series.forEach((s, idx) => {
+        ctx.fillStyle = s.color;
+        ctx.fillRect(w - 120, 14 + idx * 18, 10, 10);
+        ctx.fillStyle = "#1f2430";
+        ctx.fillText(s.label, w - 104, 24 + idx * 18);
+      });
+    }
+
+    function renderKeyValues(targetId, payload) {
+      const el = document.getElementById(targetId);
+      el.innerHTML = "";
+      Object.entries(payload).forEach(([key, value]) => {
+        const k = document.createElement("div");
+        k.textContent = key;
+        const v = document.createElement("div");
+        v.textContent = value === null || value === undefined || value === "" ? "-" : String(value);
+        el.appendChild(k);
+        el.appendChild(v);
+      });
+    }
+
+    async function postJson(url, payload) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "request failed");
+      return data;
+    }
+
+    function renderRunList() {
+      const el = document.getElementById("run-list");
+      el.innerHTML = "";
+      if (!state.runs.length) {
+        el.innerHTML = '<div class="empty">还没有实验运行记录。</div>';
+        return;
+      }
+      const sortedRuns = state.runs.slice().sort((a, b) => {
+        if (!!a.archived !== !!b.archived) return a.archived ? 1 : -1;
+        return a.run_name < b.run_name ? 1 : -1;
+      });
+      sortedRuns.forEach(run => {
+        const item = document.createElement("div");
+        item.className = "run-item" + (run.run_dir === selectedRunDir ? " active" : "");
+        item.onclick = () => {
+          selectedRunDir = run.run_dir;
+          render();
+        };
+        const meta = run.metadata || {};
+        item.innerHTML = `
+          <div class="run-title">${run.experiment_name}</div>
+          <div class="run-sub">${run.run_name}</div>
+          <div class="run-sub">阶段 ${meta.stage || '-'} · 维度 ${meta.dimension || '-'}</div>
+          <div class="run-sub">Epoch ${run.epoch || 0}/${run.total_epochs || 0} · Best ${fmt(run.best_val_acc)}</div>
+          <span class="status ${run.status === 'completed' ? 'completed' : ''} ${run.status === 'archived' ? 'archived' : ''}">${run.status}</span>
+        `;
+        el.appendChild(item);
+      });
+    }
+
+    function renderDetail() {
+      const detail = document.getElementById("detail");
+      const empty = document.getElementById("detail-empty");
+      const run = state.runs.find(r => r.run_dir === selectedRunDir) || state.runs[0];
+
+      if (!run) {
+        detail.style.display = "none";
+        empty.style.display = "block";
+        return;
+      }
+
+      selectedRunDir = run.run_dir;
+      detail.style.display = "block";
+      empty.style.display = "none";
+
+      document.getElementById("stat-name").textContent = run.experiment_name;
+      document.getElementById("stat-status").textContent = run.status;
+      document.getElementById("stat-epoch").textContent = `${run.epoch || 0}/${run.total_epochs || 0}`;
+      document.getElementById("stat-best").textContent = fmt(run.best_val_acc);
+
+      const rows = run.log_rows || [];
+      drawLines("curve-canvas", rows, [
+        { key: "train_loss", label: "train_loss", color: "#b45309" },
+        { key: "val_loss", label: "val_loss", color: "#dc2626" },
+        { key: "val_acc", label: "val_acc", color: "#0f766e" }
+      ]);
+      drawLines("lr-canvas", rows, [
+        { key: "lr", label: "lr", color: "#0369a1" }
+      ]);
+
+      const tbody = document.getElementById("epoch-table");
+      tbody.innerHTML = "";
+      rows.slice().reverse().slice(0, 12).forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.epoch}</td>
+          <td>${fmt(row.train_loss)}</td>
+          <td>${fmt(row.val_loss)}</td>
+          <td>${fmt(row.train_acc)}</td>
+          <td>${fmt(row.val_acc)}</td>
+          <td>${fmt(row.lr, 6)}</td>
+          <td>${fmt(row.epoch_time_sec, 2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const cfg = run.config || {};
+      renderKeyValues("config-kv", {
+        "model.name": cfg.model && cfg.model.name,
+        "model.pretrained": cfg.model && cfg.model.pretrained,
+        "model.activation": cfg.model && cfg.model.activation,
+        "finetune.mode": cfg.finetune && cfg.finetune.mode,
+        "image_size": cfg.data && cfg.data.image_size,
+        "val_dir": cfg.data && cfg.data.val_dir,
+        "test_dir": cfg.data && cfg.data.test_dir,
+        "augmentation": cfg.augmentation && cfg.augmentation.policy,
+        "optimizer": cfg.optimizer && cfg.optimizer.name,
+        "scheduler": cfg.scheduler && cfg.scheduler.name,
+        "epochs": cfg.train && cfg.train.epochs,
+        "batch_size": cfg.train && cfg.train.batch_size
+      });
+      renderKeyValues("meta-kv", {
+        "metadata.stage": run.metadata && run.metadata.stage,
+        "metadata.dimension": run.metadata && run.metadata.dimension,
+        "metadata.value": run.metadata && run.metadata.value,
+        "archived": run.archived ? "true" : "false",
+        "best_epoch": run.best_epoch,
+        "best_val_macro_f1": run.metrics && fmt(run.metrics.best_val_macro_f1),
+        "test_acc": run.metrics && fmt(run.metrics.test_acc),
+        "test_macro_f1": run.metrics && fmt(run.metrics.test_macro_f1),
+        "trainable_params": run.metrics && run.metrics.trainable_params,
+        "runtime_sec": run.metrics && fmt(run.metrics.total_runtime_sec, 2)
+      });
+
+      const archiveBtn = document.getElementById("archive-btn");
+      const restoreBtn = document.getElementById("restore-btn");
+      archiveBtn.style.display = run.archived ? "none" : "inline-block";
+      restoreBtn.style.display = run.archived ? "inline-block" : "none";
+      archiveBtn.onclick = async () => {
+        await postJson("/api/archive", { run_name: run.run_name });
+        await refreshState();
+      };
+      restoreBtn.onclick = async () => {
+        await postJson("/api/restore", { run_name: run.run_name });
+        await refreshState();
+      };
+
+      document.getElementById("curve-image").src = run.curve_path + "?t=" + Date.now();
+      document.getElementById("cm-image").src = run.confusion_matrix_path + "?t=" + Date.now();
+    }
+
+    function renderStageList() {
+      const el = document.getElementById("stage-list");
+      el.innerHTML = "";
+      const comparisons = state.comparisons || [];
+      if (!comparisons.length) {
+        el.innerHTML = '<div class="empty">还没有实验阶段配置。</div>';
+        return;
+      }
+      comparisons.forEach(stage => {
+        const item = document.createElement("div");
+        item.className = "stage-card" + (stage.stage === selectedStage ? " active" : "");
+        item.onclick = () => {
+          selectedStage = stage.stage;
+          render();
+        };
+        item.innerHTML = `
+          <h3>${stage.stage}</h3>
+          <div class="mini">维度：${stage.dimension || '-'}</div>
+          <div class="mini">${stage.description || ''}</div>
+          <div class="mini">已记录实验：${(stage.rows || []).length}</div>
+        `;
+        el.appendChild(item);
+      });
+    }
+
+    function renderComparison() {
+      const detail = document.getElementById("compare-detail");
+      const empty = document.getElementById("compare-empty");
+      const comparisons = state.comparisons || [];
+      const stage = comparisons.find(s => s.stage === selectedStage) || comparisons[0];
+
+      if (!stage) {
+        detail.style.display = "none";
+        empty.style.display = "block";
+        return;
+      }
+
+      selectedStage = stage.stage;
+      detail.style.display = "block";
+      empty.style.display = "none";
+
+      document.getElementById("compare-title").textContent = `阶段：${stage.stage}`;
+      document.getElementById("compare-subtitle").textContent = `${stage.description || ""} | 消融维度：${stage.dimension || "-"}`;
+
+      const tbody = document.getElementById("compare-table");
+      tbody.innerHTML = "";
+      if (!(stage.rows || []).length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty">该阶段还没有运行结果。</td></tr>`;
+        return;
+      }
+
+      stage.rows
+        .slice()
+        .sort((a, b) => (b.best_val_acc || -1) - (a.best_val_acc || -1))
+        .forEach(row => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${row.experiment_name}</td>
+            <td>${row.value ?? "-"}</td>
+            <td>${row.archived ? "archived" : (row.status || "-")}</td>
+            <td>${fmt(row.best_val_acc)}</td>
+            <td>${fmt(row.test_acc)}</td>
+            <td>${fmt(row.best_val_macro_f1)}</td>
+            <td>${fmt(row.test_macro_f1)}</td>
+            <td>${fmt(row.runtime_sec, 2)}</td>
+            <td>${row.trainable_params ?? "-"}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+    }
+
+    function render() {
+      document.getElementById("run-count-chip").textContent = `实验数：${state.runs.length}`;
+      document.getElementById("stage-count-chip").textContent = `阶段数：${(state.plan && state.plan.stages ? state.plan.stages.length : 0)}`;
+      document.getElementById("version-chip").textContent = `版本：${state.version || "-"}`;
+      document.getElementById("timestamp-chip").textContent = `最近更新：${new Date().toLocaleTimeString()}`;
+      renderRunList();
+      renderDetail();
+      renderStageList();
+      renderComparison();
+      renderSchedule();
+    }
+
+    function renderSchedule() {
+      const catalogEl = document.getElementById("catalog-list");
+      catalogEl.innerHTML = "";
+      (state.catalog || []).forEach(item => {
+        const card = document.createElement("div");
+        card.className = "stage-card";
+        card.style.cursor = "pointer";
+        card.onclick = async () => {
+          await postJson("/api/schedule/add", { experiment_name: item.experiment_name });
+          await refreshState();
+        };
+        card.innerHTML = `
+          <h3>${item.experiment_name}</h3>
+          <div class="mini">阶段：${item.stage || "-"}</div>
+          <div class="mini">维度：${item.dimension || "-"}</div>
+          <div class="mini">取值：${item.value ?? "-"}</div>
+        `;
+        catalogEl.appendChild(card);
+      });
+
+      const sched = state.schedule || { items: [] };
+      document.getElementById("schedule-status").textContent =
+        `状态：${sched.runner_status || "-"}${sched.current_item_id ? " | 当前任务中" : ""}`;
+
+      const tbody = document.getElementById("schedule-table");
+      tbody.innerHTML = "";
+      if (!(sched.items || []).length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty">队列为空。</td></tr>`;
+      } else {
+        sched.items.forEach((item, idx) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${idx + 1}. ${item.experiment_name}</td>
+            <td>${item.stage || "-"}</td>
+            <td>${item.status || "-"}</td>
+            <td>
+              <button class="action-btn" data-action="up" data-id="${item.id}">上移</button>
+              <button class="action-btn" data-action="down" data-id="${item.id}">下移</button>
+              <button class="action-btn" data-action="remove" data-id="${item.id}">删除</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      tbody.querySelectorAll("button[data-action]").forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          const action = btn.dataset.action;
+          if (action === "remove") {
+            await postJson("/api/schedule/remove", { item_id: id });
+          } else {
+            await postJson("/api/schedule/move", { item_id: id, direction: action });
+          }
+          await refreshState();
+        };
+      });
+
+      document.getElementById("schedule-start-btn").onclick = async () => {
+        await postJson("/api/schedule/start", {});
+        await refreshState();
+      };
+      document.getElementById("schedule-stop-btn").onclick = async () => {
+        await postJson("/api/schedule/stop", {});
+        await refreshState();
+      };
+      document.getElementById("schedule-clear-btn").onclick = async () => {
+        await postJson("/api/schedule/clear", {});
+        await refreshState();
+      };
+    }
+
+    async function refreshState() {
+      try {
+        const res = await fetch("/api/state?t=" + Date.now());
+        state = await res.json();
+        if (!selectedRunDir && state.runs.length) selectedRunDir = state.runs[0].run_dir;
+        if (!selectedStage && state.comparisons && state.comparisons.length) selectedStage = state.comparisons[0].stage;
+        render();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach(x => x.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach(x => x.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+      });
+    });
+
+    refreshState();
+    setInterval(refreshState, refreshMs);
+  </script>
+</body>
+</html>

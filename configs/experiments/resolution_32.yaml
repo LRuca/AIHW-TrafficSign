@@ -1,0 +1,7 @@
+experiment_name: stage3_resolution_32
+metadata:
+  stage: resolution
+  dimension: data.image_size
+  value: 32
+data:
+  image_size: 32

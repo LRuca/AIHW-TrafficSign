@@ -1,0 +1,9 @@
+experiment_name: stage5_optimizer_momentum
+metadata:
+  stage: optimizer
+  dimension: optimizer.name
+  value: momentum
+optimizer:
+  name: momentum
+  lr: 0.01
+  momentum: 0.9

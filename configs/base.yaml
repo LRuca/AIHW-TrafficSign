@@ -1,0 +1,54 @@
+experiment_name: baseline_mobilenetv2
+metadata:
+  stage: baseline
+  dimension: model.name
+  value: mobilenet_v2
+output_root: outputs/runs
+data:
+  train_dir: data/train_images
+  val_dir: data/val_images
+  test_dir: data/test_images
+  num_classes: 43
+  image_size: 64
+  num_workers: 4
+  train_split: 0.8
+  use_existing_val_dir: true
+train:
+  seed: 42
+  device: cuda
+  batch_size: 64
+  epochs: 30
+  eval_interval: 1
+  amp: true
+  grad_clip_norm: 0.0
+  label_smoothing: 0.0
+  class_weighting: false
+  save_last: true
+  max_train_batches: null
+  max_val_batches: null
+model:
+  name: mobilenet_v2
+  pretrained: true
+  dropout: 0.2
+  activation: relu
+  checkpoint_path: null
+finetune:
+  mode: full
+  freeze_epochs: 0
+augmentation:
+  policy: basic
+optimizer:
+  name: adamw
+  lr: 0.001
+  weight_decay: 0.0001
+  momentum: 0.9
+scheduler:
+  name: cosine
+  min_lr: 0.000001
+  gamma: 0.97
+  power: 2.0
+runtime:
+  save_predictions: true
+  save_confusion_matrix: true
+  save_curves: true
+  save_classwise_metrics: true

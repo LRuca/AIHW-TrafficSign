@@ -1,0 +1,7 @@
+experiment_name: stage6_scheduler_constant
+metadata:
+  stage: scheduler
+  dimension: scheduler.name
+  value: constant
+scheduler:
+  name: constant

@@ -1,0 +1,9 @@
+experiment_name: stage5_optimizer_rmsprop
+metadata:
+  stage: optimizer
+  dimension: optimizer.name
+  value: rmsprop
+optimizer:
+  name: rmsprop
+  lr: 0.001
+  momentum: 0.9

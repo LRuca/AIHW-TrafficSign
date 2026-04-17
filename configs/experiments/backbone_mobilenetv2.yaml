@@ -1,0 +1,11 @@
+experiment_name: stage1_backbone_mobilenetv2
+metadata:
+  stage: backbone
+  dimension: model.name
+  value: mobilenet_v2
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
+finetune:
+  mode: full

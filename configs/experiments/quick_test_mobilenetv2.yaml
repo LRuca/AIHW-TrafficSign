@@ -1,0 +1,16 @@
+experiment_name: quick_test_mobilenetv2
+metadata:
+  stage: debug
+  dimension: smoke_test
+  value: mobilenet_v2_debug
+data:
+  num_workers: 0
+train:
+  epochs: 5
+  batch_size: 64
+model:
+  name: mobilenet_v2
+  pretrained: false
+  activation: relu
+finetune:
+  mode: full

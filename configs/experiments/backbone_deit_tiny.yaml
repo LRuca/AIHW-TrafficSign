@@ -1,0 +1,11 @@
+experiment_name: stage1_backbone_deit_tiny
+metadata:
+  stage: backbone
+  dimension: model.name
+  value: deit_tiny_patch16_224
+model:
+  name: deit_tiny_patch16_224
+  pretrained: true
+  activation: gelu
+finetune:
+  mode: full

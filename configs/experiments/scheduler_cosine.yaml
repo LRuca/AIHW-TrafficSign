@@ -1,0 +1,7 @@
+experiment_name: stage6_scheduler_cosine
+metadata:
+  stage: scheduler
+  dimension: scheduler.name
+  value: cosine
+scheduler:
+  name: cosine

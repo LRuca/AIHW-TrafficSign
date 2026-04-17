@@ -1,0 +1,7 @@
+experiment_name: stage2_finetune_head_only
+metadata:
+  stage: finetune
+  dimension: finetune.mode
+  value: head_only
+finetune:
+  mode: head_only

@@ -1,0 +1,100 @@
+title: traffic_sign_ablation_plan
+dataset: GTSRB
+target_metric: val_acc
+secondary_metrics:
+  - val_macro_f1
+  - trainable_params
+  - total_runtime_sec
+stages:
+  - stage: debug
+    dimension: smoke_test
+    description: 用于联调训练与看板，不作为正式结论
+    experiments:
+      - experiment_name: quick_test_mobilenetv2
+        value: mobilenet_v2_debug
+  - stage: backbone
+    dimension: model.name
+    description: 比较 MobileNetV2 与 Transformer backbone
+    experiments:
+      - experiment_name: stage1_backbone_mobilenetv2
+        value: mobilenet_v2
+      - experiment_name: stage1_backbone_deit_tiny
+        value: deit_tiny_patch16_224
+  - stage: finetune
+    dimension: finetune.mode
+    description: 比较冻结分类头、最后 stage、全量微调与冻结后解冻
+    experiments:
+      - experiment_name: stage2_finetune_head_only
+        value: head_only
+      - experiment_name: stage2_finetune_last_stage
+        value: last_stage
+      - experiment_name: stage2_finetune_full
+        value: full
+      - experiment_name: stage2_finetune_freeze_then_full
+        value: freeze_then_full
+  - stage: activation
+    dimension: model.activation
+    description: 比较 ReLU 与 GELU
+    experiments:
+      - experiment_name: stage2_activation_relu
+        value: relu
+      - experiment_name: stage2_activation_gelu
+        value: gelu
+  - stage: resolution
+    dimension: data.image_size
+    description: 比较 32、64、96 输入分辨率
+    experiments:
+      - experiment_name: stage3_resolution_32
+        value: 32
+      - experiment_name: stage3_resolution_64
+        value: 64
+      - experiment_name: stage3_resolution_96
+        value: 96
+  - stage: augmentation
+    dimension: augmentation.policy
+    description: 比较 none、basic、basic_color、basic_geometric
+    experiments:
+      - experiment_name: stage4_augmentation_none
+        value: none
+      - experiment_name: stage4_augmentation_basic
+        value: basic
+      - experiment_name: stage4_augmentation_basic_color
+        value: basic_color
+      - experiment_name: stage4_augmentation_basic_geometric
+        value: basic_geometric
+  - stage: optimizer
+    dimension: optimizer.name
+    description: 比较 SGD、Momentum、RMSProp、Adam、AdamW
+    experiments:
+      - experiment_name: stage5_optimizer_sgd
+        value: sgd
+      - experiment_name: stage5_optimizer_momentum
+        value: momentum
+      - experiment_name: stage5_optimizer_rmsprop
+        value: rmsprop
+      - experiment_name: stage5_optimizer_adam
+        value: adam
+      - experiment_name: stage5_optimizer_adamw
+        value: adamw
+  - stage: scheduler
+    dimension: scheduler.name
+    description: 比较 constant、polynomial、cosine、exponential
+    experiments:
+      - experiment_name: stage6_scheduler_constant
+        value: constant
+      - experiment_name: stage6_scheduler_polynomial
+        value: polynomial
+      - experiment_name: stage6_scheduler_cosine
+        value: cosine
+      - experiment_name: stage6_scheduler_exponential
+        value: exponential
+  - stage: epochs
+    dimension: train.epochs
+    description: 在最佳配置下做长训并分析最优 checkpoint
+    experiments:
+      - experiment_name: stage7_epochs_20
+        value: 20
+      - experiment_name: stage7_epochs_40
+        value: 40
+      - experiment_name: stage7_epochs_80
+        value: 80

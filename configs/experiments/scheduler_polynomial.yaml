@@ -1,0 +1,8 @@
+experiment_name: stage6_scheduler_polynomial
+metadata:
+  stage: scheduler
+  dimension: scheduler.name
+  value: polynomial
+scheduler:
+  name: polynomial
+  power: 2.0

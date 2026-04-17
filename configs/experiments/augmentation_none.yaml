@@ -1,0 +1,7 @@
+experiment_name: stage4_augmentation_none
+metadata:
+  stage: augmentation
+  dimension: augmentation.policy
+  value: none
+augmentation:
+  policy: none

@@ -1,0 +1,9 @@
+experiment_name: stage2_activation_gelu
+metadata:
+  stage: activation
+  dimension: model.activation
+  value: gelu
+model:
+  activation: gelu
+finetune:
+  mode: full

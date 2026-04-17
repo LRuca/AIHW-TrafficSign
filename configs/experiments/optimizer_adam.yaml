@@ -1,0 +1,8 @@
+experiment_name: stage5_optimizer_adam
+metadata:
+  stage: optimizer
+  dimension: optimizer.name
+  value: adam
+optimizer:
+  name: adam
+  lr: 0.001

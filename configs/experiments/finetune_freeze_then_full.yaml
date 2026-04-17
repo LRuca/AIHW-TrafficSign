@@ -1,0 +1,8 @@
+experiment_name: stage2_finetune_freeze_then_full
+metadata:
+  stage: finetune
+  dimension: finetune.mode
+  value: freeze_then_full
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

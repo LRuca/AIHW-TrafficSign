@@ -1,0 +1,7 @@
+experiment_name: stage7_epochs_20
+metadata:
+  stage: epochs
+  dimension: train.epochs
+  value: 20
+train:
+  epochs: 20

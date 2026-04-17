@@ -1,0 +1,7 @@
+experiment_name: stage2_finetune_full
+metadata:
+  stage: finetune
+  dimension: finetune.mode
+  value: full
+finetune:
+  mode: full
