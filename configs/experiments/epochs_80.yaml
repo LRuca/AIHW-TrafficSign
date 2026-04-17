@@ -3,5 +3,12 @@ metadata:
   stage: epochs
   dimension: train.epochs
   value: 80
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
 train:
   epochs: 80
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

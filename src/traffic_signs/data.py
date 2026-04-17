@@ -107,6 +107,9 @@ def build_dataloaders(config):
     train_root = data_cfg["train_dir"]
     val_root = data_cfg["val_dir"]
     test_root = data_cfg.get("test_dir")
+    num_workers = int(data_cfg["num_workers"])
+    if os.environ.get("TRAFFIC_SIGNS_FORCE_NUM_WORKERS_ZERO") == "1":
+        num_workers = 0
 
     all_train_samples, class_names, class_to_idx = scan_imagefolder(train_root)
     if data_cfg.get("use_existing_val_dir", True) and val_root and os.path.isdir(val_root):
@@ -131,14 +134,14 @@ def build_dataloaders(config):
         train_dataset,
         batch_size=config["train"]["batch_size"],
         shuffle=True,
-        num_workers=data_cfg["num_workers"],
+        num_workers=num_workers,
         pin_memory=True,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=config["train"]["batch_size"],
         shuffle=False,
-        num_workers=data_cfg["num_workers"],
+        num_workers=num_workers,
         pin_memory=True,
     )
     test_loader = None
@@ -147,7 +150,7 @@ def build_dataloaders(config):
             test_dataset,
             batch_size=config["train"]["batch_size"],
             shuffle=False,
-            num_workers=data_cfg["num_workers"],
+            num_workers=num_workers,
             pin_memory=True,
         )
 

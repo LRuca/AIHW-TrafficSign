@@ -13,14 +13,14 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 $existing = Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue
 if ($existing) {
-    $pids = $existing | Select-Object -ExpandProperty OwningProcess -Unique
-    foreach ($pid in $pids) {
+    $listeningPids = $existing | Select-Object -ExpandProperty OwningProcess -Unique
+    foreach ($procId in $listeningPids) {
         try {
-            Stop-Process -Id $pid -Force -ErrorAction Stop
-            Write-Output "Stopped existing dashboard process: $pid"
+            Stop-Process -Id $procId -Force -ErrorAction Stop
+            Write-Output "Stopped existing dashboard process: $procId"
         }
         catch {
-            Write-Output "Failed to stop process ${pid}: $($_.Exception.Message)"
+            Write-Output "Failed to stop process ${procId}: $($_.Exception.Message)"
         }
     }
     Start-Sleep -Seconds 1

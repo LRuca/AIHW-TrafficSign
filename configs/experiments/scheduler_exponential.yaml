@@ -3,6 +3,16 @@ metadata:
   stage: scheduler
   dimension: scheduler.name
   value: exponential
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
 scheduler:
   name: exponential
   gamma: 0.97
+optimizer:
+  name: adamw
+  lr: 0.001
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

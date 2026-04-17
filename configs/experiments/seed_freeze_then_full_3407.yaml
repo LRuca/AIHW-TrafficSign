@@ -1,0 +1,15 @@
+experiment_name: stage8_seed_freeze_then_full_3407
+metadata:
+  stage: seed_validation
+  dimension: train.seed
+  value: freeze_then_full_seed3407
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
+train:
+  seed: 3407
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5
+

@@ -4,6 +4,9 @@ metadata:
   dimension: model.activation
   value: gelu
 model:
+  name: mobilenet_v2
+  pretrained: true
   activation: gelu
 finetune:
-  mode: full
+  mode: freeze_then_full
+  freeze_epochs: 5

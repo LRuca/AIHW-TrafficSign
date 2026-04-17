@@ -1,15 +1,16 @@
-experiment_name: stage5_optimizer_adamw
+experiment_name: stage9_lr_3e3
 metadata:
-  stage: optimizer
-  dimension: optimizer.name
-  value: adamw
+  stage: learning_rate
+  dimension: optimizer.lr
+  value: 0.003
 model:
   name: mobilenet_v2
   pretrained: true
   activation: relu
 optimizer:
   name: adamw
-  lr: 0.001
+  lr: 0.003
 finetune:
   mode: freeze_then_full
   freeze_epochs: 5
+

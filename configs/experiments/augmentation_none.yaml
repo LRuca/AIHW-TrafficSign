@@ -3,5 +3,12 @@ metadata:
   stage: augmentation
   dimension: augmentation.policy
   value: none
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
 augmentation:
   policy: none
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

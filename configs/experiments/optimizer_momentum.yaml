@@ -3,7 +3,14 @@ metadata:
   stage: optimizer
   dimension: optimizer.name
   value: momentum
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
 optimizer:
   name: momentum
   lr: 0.01
   momentum: 0.9
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

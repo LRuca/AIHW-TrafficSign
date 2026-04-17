@@ -346,7 +346,7 @@ class ScheduleManager(object):
                     cwd=self.project_root,
                     stdout=log_file,
                     stderr=subprocess.STDOUT,
-                    env=os.environ.copy(),
+                    env=dict(os.environ.copy(), TRAFFIC_SIGNS_FORCE_NUM_WORKERS_ZERO="1"),
                     creationflags=creationflags,
                 )
                 with self.lock:

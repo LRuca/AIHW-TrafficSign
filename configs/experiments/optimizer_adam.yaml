@@ -3,6 +3,13 @@ metadata:
   stage: optimizer
   dimension: optimizer.name
   value: adam
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
 optimizer:
   name: adam
   lr: 0.001
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

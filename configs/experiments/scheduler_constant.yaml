@@ -3,5 +3,15 @@ metadata:
   stage: scheduler
   dimension: scheduler.name
   value: constant
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
 scheduler:
   name: constant
+optimizer:
+  name: adamw
+  lr: 0.001
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

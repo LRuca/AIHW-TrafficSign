@@ -1,12 +1,14 @@
-experiment_name: stage2_activation_relu
+experiment_name: stage11_dropout_02
 metadata:
-  stage: activation
-  dimension: model.activation
-  value: relu
+  stage: dropout
+  dimension: model.dropout
+  value: 0.2
 model:
   name: mobilenet_v2
   pretrained: true
   activation: relu
+  dropout: 0.2
 finetune:
   mode: freeze_then_full
   freeze_epochs: 5
+

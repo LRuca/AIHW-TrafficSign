@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -237,7 +237,7 @@
   <div class="page">
     <section class="hero">
       <h1>交通标志实验看板</h1>
-      <p>自动刷新实验进度、训练指标、曲线、配置与横向比较结果。页面每 5 秒同步一次本地运行结果。</p>
+      <p>自动刷新实验进度、训练指标、曲线图、配置和横向比较结果。页面每 5 秒同步一次本地运行状态。</p>
       <div class="meta">
         <span class="chip">自动刷新：5s</span>
         <span class="chip" id="run-count-chip">实验数：0</span>
@@ -250,7 +250,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="detail">单实验详情</button>
       <button class="tab-btn" data-tab="compare">实验计划与横向比较</button>
-      <button class="tab-btn" data-tab="schedule">实验排程</button>
+      <button class="tab-btn" data-tab="schedule">实验排队</button>
     </div>
 
     <section id="tab-detail" class="tab-panel active">
@@ -314,7 +314,7 @@
 
             <div class="img-row">
               <div>
-                <h3>收敛图文件</h3>
+                <h3>训练曲线图</h3>
                 <img id="curve-image" alt="curves">
               </div>
               <div>
@@ -337,7 +337,7 @@
           <div id="compare-empty" class="empty">还没有阶段数据。</div>
           <div id="compare-detail" style="display:none;">
             <h2 id="compare-title">-</h2>
-      <div class="mini" id="compare-subtitle"></div>
+            <div class="mini" id="compare-subtitle"></div>
             <table>
               <thead>
                 <tr>
@@ -498,8 +498,8 @@
         item.innerHTML = `
           <div class="run-title">${run.experiment_name}</div>
           <div class="run-sub">${run.run_name}</div>
-          <div class="run-sub">阶段 ${meta.stage || '-'} · 维度 ${meta.dimension || '-'}</div>
-          <div class="run-sub">Epoch ${run.epoch || 0}/${run.total_epochs || 0} · Best ${fmt(run.best_val_acc)}</div>
+          <div class="run-sub">阶段 ${meta.stage || '-'} / 维度 ${meta.dimension || '-'}</div>
+          <div class="run-sub">Epoch ${run.epoch || 0}/${run.total_epochs || 0} / Best ${fmt(run.best_val_acc)}</div>
           <span class="status ${run.status === 'completed' ? 'completed' : ''} ${run.status === 'stopped' ? 'stopped' : ''} ${run.status === 'resumed' ? 'resumed' : ''} ${run.status === 'archived' ? 'archived' : ''}">${run.status}</span>
         `;
         el.appendChild(item);
@@ -644,7 +644,7 @@
       const tbody = document.getElementById("compare-table");
       tbody.innerHTML = "";
       if (!(stage.rows || []).length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty">该阶段还没有运行结果。</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="empty">该阶段还没有运行结果。</td></tr>`;
         return;
       }
 

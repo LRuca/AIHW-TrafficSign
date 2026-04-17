@@ -1,0 +1,14 @@
+experiment_name: stage8_seed_full_123
+metadata:
+  stage: seed_validation
+  dimension: train.seed
+  value: full_seed123
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
+train:
+  seed: 123
+finetune:
+  mode: full
+

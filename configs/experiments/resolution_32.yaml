@@ -3,5 +3,12 @@ metadata:
   stage: resolution
   dimension: data.image_size
   value: 32
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
 data:
   image_size: 32
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

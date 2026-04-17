@@ -1,18 +1,16 @@
-experiment_name: stage6_scheduler_polynomial
+experiment_name: stage9_lr_1e3
 metadata:
-  stage: scheduler
-  dimension: scheduler.name
-  value: polynomial
+  stage: learning_rate
+  dimension: optimizer.lr
+  value: 0.001
 model:
   name: mobilenet_v2
   pretrained: true
   activation: relu
-scheduler:
-  name: polynomial
-  power: 2.0
 optimizer:
   name: adamw
   lr: 0.001
 finetune:
   mode: freeze_then_full
   freeze_epochs: 5
+

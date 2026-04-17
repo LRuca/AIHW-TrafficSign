@@ -1,0 +1,14 @@
+experiment_name: stage12_label_smoothing_01
+metadata:
+  stage: label_smoothing
+  dimension: train.label_smoothing
+  value: 0.1
+model:
+  name: mobilenet_v2
+  pretrained: true
+  activation: relu
+train:
+  label_smoothing: 0.1
+finetune:
+  mode: freeze_then_full
+  freeze_epochs: 5

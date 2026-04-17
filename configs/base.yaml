@@ -10,7 +10,7 @@ data:
   test_dir: data/test_images
   num_classes: 43
   image_size: 64
-  num_workers: 4
+  num_workers: 0
   train_split: 0.8
   use_existing_val_dir: true
 train:

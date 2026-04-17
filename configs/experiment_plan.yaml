@@ -1,10 +1,11 @@
-title: traffic_sign_ablation_plan
+title: traffic_sign_complete_plan
 dataset: GTSRB
-target_metric: val_acc
+target_metric: test_acc
 secondary_metrics:
-  - val_macro_f1
-  - trainable_params
+  - test_macro_f1
+  - best_val_acc
   - total_runtime_sec
+  - trainable_params
 stages:
   - stage: debug
     dimension: smoke_test
@@ -12,17 +13,19 @@ stages:
     experiments:
       - experiment_name: quick_test_mobilenetv2
         value: mobilenet_v2_debug
+
   - stage: backbone
     dimension: model.name
-    description: 比较 MobileNetV2 与 Transformer backbone
+    description: 已完成，用于确定主干网络
     experiments:
       - experiment_name: stage1_backbone_mobilenetv2
         value: mobilenet_v2
       - experiment_name: stage1_backbone_deit_tiny
         value: deit_tiny_patch16_224
+
   - stage: finetune
     dimension: finetune.mode
-    description: 比较冻结分类头、最后 stage、全量微调与冻结后解冻
+    description: 已完成，用于确定微调策略
     experiments:
       - experiment_name: stage2_finetune_head_only
         value: head_only
@@ -32,17 +35,19 @@ stages:
         value: full
       - experiment_name: stage2_finetune_freeze_then_full
         value: freeze_then_full
+
   - stage: activation
     dimension: model.activation
-    description: 比较 ReLU 与 GELU
+    description: 在当前主线骨架上比较 ReLU 和 GELU
     experiments:
       - experiment_name: stage2_activation_relu
         value: relu
       - experiment_name: stage2_activation_gelu
         value: gelu
+
   - stage: resolution
     dimension: data.image_size
-    description: 比较 32、64、96 输入分辨率
+    description: 第一优先级，在当前最优骨架上搜索输入分辨率
     experiments:
       - experiment_name: stage3_resolution_32
         value: 32
@@ -50,9 +55,10 @@ stages:
         value: 64
       - experiment_name: stage3_resolution_96
         value: 96
+
   - stage: augmentation
     dimension: augmentation.policy
-    description: 比较 none、basic、basic_color、basic_geometric
+    description: 第二优先级，在当前最优骨架上比较数据增强策略
     experiments:
       - experiment_name: stage4_augmentation_none
         value: none
@@ -62,9 +68,10 @@ stages:
         value: basic_color
       - experiment_name: stage4_augmentation_basic_geometric
         value: basic_geometric
+
   - stage: optimizer
     dimension: optimizer.name
-    description: 比较 SGD、Momentum、RMSProp、Adam、AdamW
+    description: 在当前最优骨架上比较优化器
     experiments:
       - experiment_name: stage5_optimizer_sgd
         value: sgd
@@ -76,9 +83,10 @@ stages:
         value: adam
       - experiment_name: stage5_optimizer_adamw
         value: adamw
+
   - stage: scheduler
     dimension: scheduler.name
-    description: 比较 constant、polynomial、cosine、exponential
+    description: 在当前最优骨架上比较学习率调度策略
     experiments:
       - experiment_name: stage6_scheduler_constant
         value: constant
@@ -88,9 +96,10 @@ stages:
         value: cosine
       - experiment_name: stage6_scheduler_exponential
         value: exponential
+
   - stage: epochs
     dimension: train.epochs
-    description: 在最佳配置下做长训并分析最优 checkpoint
+    description: 第三优先级，确认当前最优设置的训练时长
     experiments:
       - experiment_name: stage7_epochs_20
         value: 20
@@ -98,3 +107,60 @@ stages:
         value: 40
       - experiment_name: stage7_epochs_80
         value: 80
+
+  - stage: seed_validation
+    dimension: train.seed
+    description: 用多 seed 验证 freeze_then_full 是否稳定优于 full
+    experiments:
+      - experiment_name: stage8_seed_freeze_then_full_123
+        value: freeze_then_full_seed123
+      - experiment_name: stage8_seed_freeze_then_full_3407
+        value: freeze_then_full_seed3407
+      - experiment_name: stage8_seed_full_123
+        value: full_seed123
+      - experiment_name: stage8_seed_full_3407
+        value: full_seed3407
+
+  - stage: learning_rate
+    dimension: optimizer.lr
+    description: 在当前最优骨架上搜索学习率
+    experiments:
+      - experiment_name: stage9_lr_3e4
+        value: 0.0003
+      - experiment_name: stage9_lr_1e3
+        value: 0.001
+      - experiment_name: stage9_lr_3e3
+        value: 0.003
+
+  - stage: weight_decay
+    dimension: optimizer.weight_decay
+    description: 在当前最优骨架上搜索权重衰减
+    experiments:
+      - experiment_name: stage10_weight_decay_1e5
+        value: 0.00001
+      - experiment_name: stage10_weight_decay_1e4
+        value: 0.0001
+      - experiment_name: stage10_weight_decay_1e3
+        value: 0.001
+
+  - stage: dropout
+    dimension: model.dropout
+    description: 在当前最优骨架上搜索分类头 dropout
+    experiments:
+      - experiment_name: stage11_dropout_01
+        value: 0.1
+      - experiment_name: stage11_dropout_02
+        value: 0.2
+      - experiment_name: stage11_dropout_03
+        value: 0.3
+
+  - stage: label_smoothing
+    dimension: train.label_smoothing
+    description: 在当前最优骨架上搜索标签平滑
+    experiments:
+      - experiment_name: stage12_label_smoothing_0
+        value: 0.0
+      - experiment_name: stage12_label_smoothing_005
+        value: 0.05
+      - experiment_name: stage12_label_smoothing_01
+        value: 0.1
