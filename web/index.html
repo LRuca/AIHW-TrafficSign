@@ -107,6 +107,8 @@
       background: var(--run);
     }
     .status.completed { background: var(--ok); }
+    .status.stopped { background: #b45309; }
+    .status.resumed { background: #7c3aed; }
     .status.archived { background: #7c3aed; }
     .stats {
       display: grid;
@@ -498,7 +500,7 @@
           <div class="run-sub">${run.run_name}</div>
           <div class="run-sub">阶段 ${meta.stage || '-'} · 维度 ${meta.dimension || '-'}</div>
           <div class="run-sub">Epoch ${run.epoch || 0}/${run.total_epochs || 0} · Best ${fmt(run.best_val_acc)}</div>
-          <span class="status ${run.status === 'completed' ? 'completed' : ''} ${run.status === 'archived' ? 'archived' : ''}">${run.status}</span>
+          <span class="status ${run.status === 'completed' ? 'completed' : ''} ${run.status === 'stopped' ? 'stopped' : ''} ${run.status === 'resumed' ? 'resumed' : ''} ${run.status === 'archived' ? 'archived' : ''}">${run.status}</span>
         `;
         el.appendChild(item);
       });

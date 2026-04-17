@@ -1,6 +1,7 @@
 import math
 import os
 import random
+import signal
 import time
 from datetime import datetime
 
@@ -12,6 +13,10 @@ import torch.nn as nn
 from traffic_signs.analysis import save_classwise_metrics, save_confusion_matrix_figure, save_curves, save_json, save_lr_curve
 from traffic_signs.data import build_dataloaders, compute_class_weights
 from traffic_signs.models import build_model, set_finetune_mode
+
+
+class TrainingInterrupted(Exception):
+    pass
 
 
 def set_seed(seed):
@@ -63,6 +68,31 @@ def make_output_dir(config):
 
 def write_live_status(run_dir, payload):
     save_json(os.path.join(run_dir, "status.json"), payload)
+
+
+def write_resume_checkpoint(
+    run_dir,
+    model,
+    optimizer,
+    scheduler,
+    scaler,
+    epoch,
+    best_val_acc,
+    best_epoch,
+    config,
+):
+    checkpoint_payload = {
+        "epoch": epoch,
+        "best_val_acc": best_val_acc,
+        "best_epoch": best_epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "scheduler_state_dict": scheduler.state_dict(),
+        "scaler_state_dict": scaler.state_dict(),
+        "experiment_name": config["experiment_name"],
+        "train_seed": config["train"]["seed"],
+    }
+    torch.save(checkpoint_payload, os.path.join(run_dir, "resume_checkpoint.pt"))
 
 
 def flush_epoch_logs(logs, run_dir, experiment_name):
@@ -206,10 +236,29 @@ def count_trainable_params(model):
     return sum(param.numel() for param in model.parameters() if param.requires_grad)
 
 
+def load_resume_checkpoint(config):
+    checkpoint_path = config.get("model", {}).get("checkpoint_path")
+    if not checkpoint_path or not os.path.exists(checkpoint_path):
+        return None
+    return torch.load(checkpoint_path, map_location="cpu")
+
+
+def _signal_to_name(sig):
+    if sig == getattr(signal, "SIGTERM", None):
+        return "SIGTERM"
+    if sig == getattr(signal, "SIGINT", None):
+        return "SIGINT"
+    if sig == getattr(signal, "SIGBREAK", None):
+        return "SIGBREAK"
+    return str(sig)
+
+
 def run_experiment(config, project_root):
     set_seed(config["train"]["seed"])
     device = resolve_device(config["train"]["device"])
-    run_dir = make_output_dir(config)
+    runtime_cfg = config.setdefault("runtime", {})
+    run_dir = runtime_cfg.get("resume_run_dir") or make_output_dir(config)
+    os.makedirs(run_dir, exist_ok=True)
     save_config_snapshot(config, run_dir)
     write_live_status(
         run_dir,
@@ -241,152 +290,255 @@ def run_experiment(config, project_root):
     scaler = torch.cuda.amp.GradScaler(enabled=(config["train"].get("amp", True) and device.type == "cuda"))
     optimizer_rebuilt = False
 
-    logs = []
+    log_path = os.path.join(run_dir, "train_log.csv")
+    if os.path.exists(log_path):
+        logs = pd.read_csv(log_path, encoding="utf-8-sig").to_dict("records")
+    else:
+        logs = []
     best_val_acc = -1.0
     best_epoch = -1
     best_metrics = None
     best_state_path = os.path.join(run_dir, "best.pt")
     start_time = time.time()
+    start_epoch = 0
+    resume_payload = load_resume_checkpoint(config)
+    interrupted = {"requested": False, "signal_name": None}
 
-    for epoch in range(config["train"]["epochs"]):
-        if config["finetune"]["mode"] == "freeze_then_full":
-            set_finetune_mode(model, config, epoch=epoch)
-            if epoch == config["finetune"].get("freeze_epochs", 0) and not optimizer_rebuilt:
-                optimizer = create_optimizer(model, config)
-                scheduler = create_scheduler(optimizer, config)
-                optimizer_rebuilt = True
+    def handle_interrupt(sig, frame):
+        interrupted["requested"] = True
+        interrupted["signal_name"] = _signal_to_name(sig)
+        raise TrainingInterrupted()
 
-        epoch_start = time.time()
-        train_loss, train_acc = train_one_epoch(model, bundle["train_loader"], criterion, optimizer, device, scaler, config)
-        val_metrics = evaluate(model, bundle["val_loader"], criterion, device, config)
-        current_lr = optimizer.param_groups[0]["lr"]
-        scheduler.step()
-        log_row = {
-            "epoch": epoch + 1,
-            "train_loss": train_loss,
-            "train_acc": train_acc,
-            "val_loss": val_metrics["loss"],
-            "val_acc": val_metrics["acc"],
-            "val_macro_f1": val_metrics["macro_f1"],
-            "lr": current_lr,
-            "epoch_time_sec": time.time() - epoch_start,
-        }
-        logs.append(log_row)
-        print(log_row)
+    previous_handlers = {}
+    signal_map = [sig for sig in [getattr(signal, "SIGTERM", None), getattr(signal, "SIGINT", None), getattr(signal, "SIGBREAK", None)] if sig is not None]
+    for sig in signal_map:
+        previous_handlers[sig] = signal.getsignal(sig)
+        signal.signal(sig, handle_interrupt)
+
+    if resume_payload is not None:
+        model.load_state_dict(resume_payload["model_state_dict"])
+        optimizer.load_state_dict(resume_payload["optimizer_state_dict"])
+        scheduler.load_state_dict(resume_payload["scheduler_state_dict"])
+        scaler_state_dict = resume_payload.get("scaler_state_dict") or {}
+        if scaler_state_dict:
+            scaler.load_state_dict(scaler_state_dict)
+        start_epoch = int(resume_payload.get("epoch", 0))
+        best_val_acc = float(resume_payload.get("best_val_acc", -1.0))
+        best_epoch = int(resume_payload.get("best_epoch", -1))
+        if config["finetune"]["mode"] == "freeze_then_full" and start_epoch > config["finetune"].get("freeze_epochs", 0):
+            optimizer_rebuilt = True
+        write_live_status(
+            run_dir,
+            {
+                "experiment_name": config["experiment_name"],
+                "status": "resumed",
+                "epoch": start_epoch,
+                "total_epochs": config["train"]["epochs"],
+                "best_val_acc": best_val_acc if best_val_acc >= 0 else None,
+                "best_epoch": best_epoch if best_epoch >= 0 else None,
+                "run_dir": run_dir,
+                "resumed_from_checkpoint": config["model"].get("checkpoint_path"),
+            },
+        )
+
+    try:
+        for epoch in range(start_epoch, config["train"]["epochs"]):
+            if config["finetune"]["mode"] == "freeze_then_full":
+                set_finetune_mode(model, config, epoch=epoch)
+                if epoch == config["finetune"].get("freeze_epochs", 0) and not optimizer_rebuilt:
+                    optimizer = create_optimizer(model, config)
+                    scheduler = create_scheduler(optimizer, config)
+                    optimizer_rebuilt = True
+
+            epoch_start = time.time()
+            train_loss, train_acc = train_one_epoch(model, bundle["train_loader"], criterion, optimizer, device, scaler, config)
+            val_metrics = evaluate(model, bundle["val_loader"], criterion, device, config)
+            current_lr = optimizer.param_groups[0]["lr"]
+            scheduler.step()
+            log_row = {
+                "epoch": epoch + 1,
+                "train_loss": train_loss,
+                "train_acc": train_acc,
+                "val_loss": val_metrics["loss"],
+                "val_acc": val_metrics["acc"],
+                "val_macro_f1": val_metrics["macro_f1"],
+                "lr": current_lr,
+                "epoch_time_sec": time.time() - epoch_start,
+            }
+            logs.append(log_row)
+            print(log_row)
+            flush_epoch_logs(logs, run_dir, config["experiment_name"])
+
+            if val_metrics["acc"] > best_val_acc:
+                best_val_acc = val_metrics["acc"]
+                best_epoch = epoch + 1
+                best_metrics = val_metrics
+                torch.save(model.state_dict(), best_state_path)
+
+            write_resume_checkpoint(
+                run_dir,
+                model,
+                optimizer,
+                scheduler,
+                scaler,
+                epoch + 1,
+                best_val_acc,
+                best_epoch,
+                config,
+            )
+            if config["train"].get("save_last", True):
+                torch.save(model.state_dict(), os.path.join(run_dir, "last.pt"))
+
+            write_live_status(
+                run_dir,
+                {
+                    "experiment_name": config["experiment_name"],
+                    "status": "running",
+                    "epoch": epoch + 1,
+                    "total_epochs": config["train"]["epochs"],
+                    "latest": log_row,
+                    "best_val_acc": best_val_acc if best_val_acc >= 0 else None,
+                    "best_epoch": best_epoch if best_epoch >= 0 else None,
+                    "run_dir": run_dir,
+                    "resume_checkpoint_path": os.path.join(run_dir, "resume_checkpoint.pt"),
+                },
+            )
+
+        if config["train"].get("save_last", True):
+            torch.save(model.state_dict(), os.path.join(run_dir, "last.pt"))
+
+        log_df = pd.DataFrame(logs)
         flush_epoch_logs(logs, run_dir, config["experiment_name"])
+
+        metrics_payload = {
+            "experiment_name": config["experiment_name"],
+            "best_epoch": best_epoch,
+            "best_val_acc": best_val_acc,
+            "best_val_macro_f1": best_metrics["macro_f1"] if best_metrics else None,
+            "trainable_params": count_trainable_params(model),
+            "total_runtime_sec": time.time() - start_time,
+            "device": str(device),
+            "train_size": len(bundle["train_samples"]),
+            "val_size": len(bundle["val_samples"]),
+            "test_size": len(bundle["test_samples"]),
+        }
+
+        if best_metrics is None and os.path.exists(best_state_path):
+            model.load_state_dict(torch.load(best_state_path, map_location=device))
+            best_metrics = evaluate(model, bundle["val_loader"], criterion, device, config)
+            metrics_payload["best_val_macro_f1"] = best_metrics["macro_f1"]
+
+        test_metrics = None
+        if bundle.get("test_loader") is not None and os.path.exists(best_state_path):
+            model.load_state_dict(torch.load(best_state_path, map_location=device))
+            test_metrics = evaluate(model, bundle["test_loader"], criterion, device, config)
+            metrics_payload["test_acc"] = test_metrics["acc"]
+            metrics_payload["test_macro_f1"] = test_metrics["macro_f1"]
+
+        save_json(os.path.join(run_dir, "metrics.json"), metrics_payload)
+
+        if config["runtime"].get("save_curves", True):
+            save_curves(log_df, os.path.join(run_dir, "curves.png"), config["experiment_name"])
+            save_lr_curve(log_df, os.path.join(run_dir, "lr_curve.png"), "Learning Rate")
+
+        predictions_df = pd.DataFrame({
+            "image_path": best_metrics["paths"],
+            "y_true": best_metrics["targets"],
+            "y_pred": best_metrics["preds"],
+            "confidence": best_metrics["confidences"],
+        })
+        if config["runtime"].get("save_predictions", True):
+            predictions_df.to_csv(os.path.join(run_dir, "val_predictions.csv"), index=False, encoding="utf-8-sig")
+
+        if config["runtime"].get("save_confusion_matrix", True):
+            save_confusion_matrix_figure(
+                best_metrics["targets"],
+                best_metrics["preds"],
+                bundle["class_names"],
+                os.path.join(run_dir, "confusion_matrix.png"),
+                "{} confusion matrix".format(config["experiment_name"]),
+            )
+
+        if config["runtime"].get("save_classwise_metrics", True):
+            save_classwise_metrics(
+                predictions_df,
+                bundle["class_names"],
+                bundle["train_samples"],
+                os.path.join(run_dir, "classwise_metrics.csv"),
+            )
+
+        if test_metrics is not None:
+            test_predictions_df = pd.DataFrame({
+                "image_path": test_metrics["paths"],
+                "y_true": test_metrics["targets"],
+                "y_pred": test_metrics["preds"],
+                "confidence": test_metrics["confidences"],
+            })
+            test_predictions_df.to_csv(os.path.join(run_dir, "test_predictions.csv"), index=False, encoding="utf-8-sig")
+            save_classwise_metrics(
+                test_predictions_df,
+                bundle["class_names"],
+                bundle["train_samples"],
+                os.path.join(run_dir, "test_classwise_metrics.csv"),
+            )
+            save_confusion_matrix_figure(
+                test_metrics["targets"],
+                test_metrics["preds"],
+                bundle["class_names"],
+                os.path.join(run_dir, "test_confusion_matrix.png"),
+                "{} test confusion matrix".format(config["experiment_name"]),
+            )
+
+        resume_checkpoint_path = os.path.join(run_dir, "resume_checkpoint.pt")
+        if os.path.exists(resume_checkpoint_path):
+            os.remove(resume_checkpoint_path)
 
         write_live_status(
             run_dir,
             {
                 "experiment_name": config["experiment_name"],
-                "status": "running",
-                "epoch": epoch + 1,
+                "status": "completed",
+                "epoch": config["train"]["epochs"],
                 "total_epochs": config["train"]["epochs"],
-                "latest": log_row,
-                "best_val_acc": best_val_acc if best_val_acc >= 0 else None,
-                "best_epoch": best_epoch if best_epoch >= 0 else None,
+                "best_val_acc": best_val_acc,
+                "best_epoch": best_epoch,
                 "run_dir": run_dir,
+                "metrics": metrics_payload,
             },
         )
 
-        if val_metrics["acc"] > best_val_acc:
-            best_val_acc = val_metrics["acc"]
-            best_epoch = epoch + 1
-            best_metrics = val_metrics
-            torch.save(model.state_dict(), best_state_path)
-
-    if config["train"].get("save_last", True):
-        torch.save(model.state_dict(), os.path.join(run_dir, "last.pt"))
-
-    log_df = pd.DataFrame(logs)
-    flush_epoch_logs(logs, run_dir, config["experiment_name"])
-
-    metrics_payload = {
-        "experiment_name": config["experiment_name"],
-        "best_epoch": best_epoch,
-        "best_val_acc": best_val_acc,
-        "best_val_macro_f1": best_metrics["macro_f1"] if best_metrics else None,
-        "trainable_params": count_trainable_params(model),
-        "total_runtime_sec": time.time() - start_time,
-        "device": str(device),
-        "train_size": len(bundle["train_samples"]),
-        "val_size": len(bundle["val_samples"]),
-        "test_size": len(bundle["test_samples"]),
-    }
-
-    test_metrics = None
-    if bundle.get("test_loader") is not None and os.path.exists(best_state_path):
-        model.load_state_dict(torch.load(best_state_path, map_location=device))
-        test_metrics = evaluate(model, bundle["test_loader"], criterion, device, config)
-        metrics_payload["test_acc"] = test_metrics["acc"]
-        metrics_payload["test_macro_f1"] = test_metrics["macro_f1"]
-
-    save_json(os.path.join(run_dir, "metrics.json"), metrics_payload)
-
-    if config["runtime"].get("save_curves", True):
-        save_curves(log_df, os.path.join(run_dir, "curves.png"), config["experiment_name"])
-        save_lr_curve(log_df, os.path.join(run_dir, "lr_curve.png"), "Learning Rate")
-
-    predictions_df = pd.DataFrame({
-        "image_path": best_metrics["paths"],
-        "y_true": best_metrics["targets"],
-        "y_pred": best_metrics["preds"],
-        "confidence": best_metrics["confidences"],
-    })
-    if config["runtime"].get("save_predictions", True):
-        predictions_df.to_csv(os.path.join(run_dir, "val_predictions.csv"), index=False, encoding="utf-8-sig")
-
-    if config["runtime"].get("save_confusion_matrix", True):
-        save_confusion_matrix_figure(
-            best_metrics["targets"],
-            best_metrics["preds"],
-            bundle["class_names"],
-            os.path.join(run_dir, "confusion_matrix.png"),
-            "{} confusion matrix".format(config["experiment_name"]),
+        print("Run artifacts saved to {}".format(run_dir))
+    except TrainingInterrupted:
+        interrupted_epoch = logs[-1]["epoch"] if logs else start_epoch
+        if config["train"].get("save_last", True):
+            torch.save(model.state_dict(), os.path.join(run_dir, "last.pt"))
+        write_resume_checkpoint(
+            run_dir,
+            model,
+            optimizer,
+            scheduler,
+            scaler,
+            interrupted_epoch,
+            best_val_acc,
+            best_epoch,
+            config,
         )
-
-    if config["runtime"].get("save_classwise_metrics", True):
-        save_classwise_metrics(
-            predictions_df,
-            bundle["class_names"],
-            bundle["train_samples"],
-            os.path.join(run_dir, "classwise_metrics.csv"),
+        write_live_status(
+            run_dir,
+            {
+                "experiment_name": config["experiment_name"],
+                "status": "stopped",
+                "epoch": interrupted_epoch,
+                "total_epochs": config["train"]["epochs"],
+                "best_val_acc": best_val_acc if best_val_acc >= 0 else None,
+                "best_epoch": best_epoch if best_epoch >= 0 else None,
+                "run_dir": run_dir,
+                "resume_checkpoint_path": os.path.join(run_dir, "resume_checkpoint.pt"),
+                "stop_reason": interrupted["signal_name"] or "external_stop",
+            },
         )
-
-    if test_metrics is not None:
-        test_predictions_df = pd.DataFrame({
-            "image_path": test_metrics["paths"],
-            "y_true": test_metrics["targets"],
-            "y_pred": test_metrics["preds"],
-            "confidence": test_metrics["confidences"],
-        })
-        test_predictions_df.to_csv(os.path.join(run_dir, "test_predictions.csv"), index=False, encoding="utf-8-sig")
-        save_classwise_metrics(
-            test_predictions_df,
-            bundle["class_names"],
-            bundle["train_samples"],
-            os.path.join(run_dir, "test_classwise_metrics.csv"),
-        )
-        save_confusion_matrix_figure(
-            test_metrics["targets"],
-            test_metrics["preds"],
-            bundle["class_names"],
-            os.path.join(run_dir, "test_confusion_matrix.png"),
-            "{} test confusion matrix".format(config["experiment_name"]),
-        )
-
-    write_live_status(
-        run_dir,
-        {
-            "experiment_name": config["experiment_name"],
-            "status": "completed",
-            "epoch": config["train"]["epochs"],
-            "total_epochs": config["train"]["epochs"],
-            "best_val_acc": best_val_acc,
-            "best_epoch": best_epoch,
-            "run_dir": run_dir,
-            "metrics": metrics_payload,
-        },
-    )
-
-    print("Run artifacts saved to {}".format(run_dir))
+        print("Training interrupted. Resume checkpoint saved to {}".format(os.path.join(run_dir, "resume_checkpoint.pt")))
+        raise
+    finally:
+        for sig, previous_handler in previous_handlers.items():
+            signal.signal(sig, previous_handler)

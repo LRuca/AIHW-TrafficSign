@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 import os
+import signal
 import shutil
 import subprocess
 import sys
@@ -86,6 +87,32 @@ def discover_experiment_configs(project_root):
 
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
+
+
+def find_resume_candidate(project_root, experiment_name):
+    runs_root = os.path.join(project_root, "outputs", "runs")
+    if not os.path.isdir(runs_root):
+        return None
+    candidates = []
+    for run_name in os.listdir(runs_root):
+        run_dir = os.path.join(runs_root, run_name)
+        if not os.path.isdir(run_dir):
+            continue
+        status = read_json_if_exists(os.path.join(run_dir, "status.json")) or {}
+        if status.get("experiment_name") != experiment_name:
+            continue
+        resume_checkpoint_path = status.get("resume_checkpoint_path") or os.path.join(run_dir, "resume_checkpoint.pt")
+        if status.get("status") == "stopped" and os.path.exists(resume_checkpoint_path):
+            candidates.append((run_name, run_dir, resume_checkpoint_path, status))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    _, run_dir, resume_checkpoint_path, status = candidates[0]
+    return {
+        "run_dir": run_dir,
+        "resume_checkpoint_path": resume_checkpoint_path,
+        "epoch": status.get("epoch", 0),
+    }
 
 
 def move_run(run_name, source_root, target_root):
@@ -191,6 +218,7 @@ class ScheduleManager(object):
         entry = self._find_catalog_entry(experiment_name)
         if not entry or not entry.get("config_path"):
             raise ValueError("Unknown experiment: {}".format(experiment_name))
+        resume_candidate = find_resume_candidate(self.project_root, experiment_name)
         with self.lock:
             item_id = "{}-{}".format(int(time.time() * 1000), len(self.state["items"]))
             self.state["items"].append({
@@ -206,6 +234,9 @@ class ScheduleManager(object):
                 "finished_at": None,
                 "return_code": None,
                 "log_path": None,
+                "run_dir": resume_candidate.get("run_dir") if resume_candidate else None,
+                "resume_checkpoint_path": resume_candidate.get("resume_checkpoint_path") if resume_candidate else None,
+                "resume_epoch": resume_candidate.get("epoch") if resume_candidate else 0,
             })
             self._save_state()
 
@@ -251,9 +282,15 @@ class ScheduleManager(object):
             self._save_state()
         if proc is not None:
             try:
-                proc.terminate()
+                if os.name == "nt":
+                    proc.send_signal(signal.CTRL_BREAK_EVENT)
+                else:
+                    proc.terminate()
             except Exception:
-                pass
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
 
     def _worker_loop(self):
         while True:
@@ -297,15 +334,20 @@ class ScheduleManager(object):
                 "--config",
                 next_item["config_path"],
             ]
+            if next_item.get("run_dir") and next_item.get("resume_checkpoint_path"):
+                command.extend(["--resume-run-dir", next_item["run_dir"]])
+                command.extend(["--resume-checkpoint", next_item["resume_checkpoint_path"]])
             with open(log_path, "a", encoding="utf-8") as log_file:
                 log_file.write("Starting {}\n".format(" ".join(command)))
                 log_file.flush()
+                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
                 proc = subprocess.Popen(
                     command,
                     cwd=self.project_root,
                     stdout=log_file,
                     stderr=subprocess.STDOUT,
                     env=os.environ.copy(),
+                    creationflags=creationflags,
                 )
                 with self.lock:
                     self.process = proc
@@ -323,6 +365,8 @@ class ScheduleManager(object):
                     self._save_state()
                     return
                 next_item["status"] = "completed" if return_code == 0 else "failed"
+                if next_item["status"] == "completed":
+                    next_item["resume_checkpoint_path"] = None
                 self.state["current_item_id"] = None
                 self.process = None
                 self._save_state()
